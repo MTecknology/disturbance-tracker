@@ -1,27 +1,21 @@
-.. _train:
-
 Model Training
---------------
+==============
 
 Training a model is essentially a continuous loop of making a random model and
 then comparing it's effectiveness to the current best.
 
-  .. note::
-
+!!! note
     If a model already exists, it will be used to prime the training routine.
 
-After all testing and training data is generated, the process can be initiated
-with:
+After all testing and training data is prepared, training can be initiated with:
+```sh
+    python3 -m train.model -M $model -y $tagged_clips -n $NO_MATCH_clips
+```
 
-  .. code-block:: sh
+This will continue until `target_accuracy` (from `config.yml`) is met.
 
-    python3 -m apr -a train
-
-This will continue until ``target_accuracy`` (from ``config.yml``) is met.
-
-  .. code-block:: text
-
-    python3 -m apr -a train
+```text
+    python3 -m train.model -M clap -y _workspace/tagged/clap -n _workspace/tagged/no-match
     INFO:Training iteration 1
     INFO:Overall accuracy[1] is 50.0
     INFO:Accuracy increased; keeping new model
@@ -37,7 +31,8 @@ This will continue until ``target_accuracy`` (from ``config.yml``) is met.
     INFO:Overall accuracy[12] is 86.36363636363637
     INFO:Accuracy increased; keeping new model
     INFO:TRAINING COMPLETE :: Final Accuracy: 86.36363636363637
+```
 
-The final products of this training process are ``model.pth`` and ``model.wav``.
+The final products of this training process are `model.pth` and `model.wav`.
 These two files can be copied into another workspace and then used for
-:ref:`content inspection (detection) <inspect>`.
+[content inspection (detection)](inspect.md).
