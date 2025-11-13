@@ -1,6 +1,8 @@
-package log
+package log_test
 
 import (
+	"dtrack/log"
+
 	"bytes"
 	"io"
 	"os"
@@ -56,10 +58,10 @@ func TestDebug(t *testing.T) {
 	expectedFormat := "[DEBUG]\t Debug message: check\n"
 
 	// 1. Test when Debug_Enabled is TRUE (should print)
-	Debug_Enabled = true
+	log.Debug_Enabled = true
 	output := captureStdout(func() {
 		// FIX: Using a constant string literal for the format to avoid "non-constant format string" error
-		Debug("Debug message: %s", testArg)
+		log.Debug("Debug message: %s", testArg)
 	})
 
 	if output != expectedFormat {
@@ -67,9 +69,9 @@ func TestDebug(t *testing.T) {
 	}
 
 	// 2. Test when Debug_Enabled is FALSE (should NOT print)
-	Debug_Enabled = false
+	log.Debug_Enabled = false
 	output = captureStdout(func() {
-		Debug("This message should not print")
+		log.Debug("This message should not print")
 	})
 
 	if output != "" {
@@ -82,7 +84,7 @@ func TestInfo(t *testing.T) {
 
 	output := captureStdout(func() {
 		// FIX: Using a constant string literal for the format to avoid "non-constant format string" error
-		Info("System initialized")
+		log.Info("System initialized")
 	})
 
 	if output != expectedFormat {
@@ -96,7 +98,7 @@ func TestWarn(t *testing.T) {
 
 	output := captureStderr(func() {
 		// FIX: Using a constant string literal for the format to avoid "non-constant format string" error
-		Warn("Memory limit reached: %dMB", testArg)
+		log.Warn("Memory limit reached: %dMB", testArg)
 	})
 
 	if output != expectedFormat {
@@ -107,7 +109,7 @@ func TestWarn(t *testing.T) {
 func TestDie(t *testing.T) {
 	// If the environment variable is set, it means we are in the subprocess.
 	if os.Getenv("BE_A_SUBPROCESS") == "1" {
-		Die("Test crash reason: %s", "File missing")
+		log.Die("Test crash reason: %s", "File missing")
 		// The os.Exit(1) call in Die prevents this line from being reached.
 		return
 	}

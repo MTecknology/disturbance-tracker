@@ -1,6 +1,10 @@
-package state
+package state_test
 
 import (
+	// DTrack
+	"dtrack/state"
+
+	// Standard
 	"os"
 	"testing"
 )
@@ -37,9 +41,9 @@ func TestLoad_Configuration_WithTempFile(t *testing.T) {
 	}
 
 	// Load configuration from the temp file
-	Load_Configuration(tmpFile.Name())
+	state.Load_Configuration(tmpFile.Name())
 
-	cfg := Runtime
+	cfg := state.Runtime
 
 	// Verify some fields
 	if cfg.Workspace != "/tmp/demo_workspace" {

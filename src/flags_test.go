@@ -1,6 +1,7 @@
-package main
+package main_test
 
 import (
+	. "dtrack"
 	"testing"
 )
 

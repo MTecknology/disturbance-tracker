@@ -1,6 +1,8 @@
-package daemon
+package daemon_test
 
 import (
+	"dtrack/daemon"
+
 	"bytes"
 	"io"
 	"strings"
@@ -15,7 +17,7 @@ func TestPipe2DevNull(t *testing.T) {
 
 	// Call the function
 	// Function is called directly because the test is in package common.
-	Pipe2DevNull(r)
+	daemon.Pipe2DevNull(r)
 
 	// Verify the reader is fully consumed by trying to read again.
 	var buf bytes.Buffer
