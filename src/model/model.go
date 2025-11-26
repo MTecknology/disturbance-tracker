@@ -216,8 +216,6 @@ func Infer(inferModel OnnxModel, preparedAudio *tensor.Dense) map[string]float64
 	return results
 }
 
-// --- Helper Functions ---
-
 func softmax(logits []float64) []float64 {
 	max := -math.MaxFloat64
 	for _, v := range logits {
@@ -237,6 +235,7 @@ func softmax(logits []float64) []float64 {
 	return exps
 }
 
+// normalizeAudio converts raw 16-bit PCM bytes into a normalized float32 slice.
 func normalizeAudio(pcmData []byte) []float32 {
 	numSamples := len(pcmData) / 2
 	audioArray := make([]float32, numSamples)
@@ -247,6 +246,7 @@ func normalizeAudio(pcmData []byte) []float32 {
 	return audioArray
 }
 
+// powerToDb converts a power spectrogram to decibels.
 func powerToDb(spec []float64) []float64 {
 	dbSpec := make([]float64, len(spec))
 	var maxPower float64 = 0.0

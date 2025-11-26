@@ -32,12 +32,12 @@ class NoiseDetector(nn.Module):
     '''
     def __init__(self, num_classes=2):
         super().__init__()
-        
+
         # Determine output features based on class count
         # For Binary (1 output), Multi-class (N outputs)
         # Note: We use CrossEntropyLoss for multi-class, so we need N outputs.
-        # If num_classes is 2, we technically could use 1 with Sigmoid, 
-        # but to keep logic consistent for "Arbitrary" classes, we use N outputs + Softmax.
+        # If num_classes is 2, we technically could use 1 with Sigmoid, but
+        # we use "N outputs + Softmax" to support arbitrary number of classes
         self.num_classes = num_classes
 
         self.features = nn.Sequential(

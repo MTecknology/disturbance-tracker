@@ -1,3 +1,8 @@
+// ##
+// DTrack Package: Surveilance Monitor
+//
+// Collects audio+video files and logs any matched audio disturbances.
+// ##
 package daemon
 
 import (
@@ -167,7 +172,6 @@ func stream_to_segment(stream *io.PipeReader, segments chan<- audio_segment) {
 }
 
 // Primary loop that tests each audio segment against a trained model
-// Updated to handle Multi-Class Map Output
 func scan_segments(name string, audio_stream chan *tensor.Dense) {
 	// Load the model (and implicit json labels)
 	ml := model.Load(state.Runtime.Workspace + "/models/" + name + ".onnx")

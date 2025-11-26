@@ -20,30 +20,29 @@ def check_input():
     '''
     options = ai.options.bootstrap()
     workspace = pathlib.Path(options['workspace'])
-    
+
     # Load models and their labels
     loaded_models = {}
-    
+
     if not options['inspect_models']:
         raise ValueError('No inspection models are configured.')
-        
+
     for model_name in options['inspect_models']:
         # Load Labels
         labels_path = workspace / 'models' / f'{model_name}_labels.json'
         if not labels_path.exists():
-             raise FileNotFoundError(f"Labels file missing for {model_name}. Run training first.")
-        
+            raise FileNotFoundError(f'Labels missing for {model_name}')
+
         with open(labels_path, 'r') as fh:
             labels = json.load(fh)
-            
+
         # Load Model
         pth_path = workspace / 'models' / f'{model_name}.pth'
         model = ai.model.load(pth_path, num_classes=len(labels))
-        
+
         loaded_models[model_name] = {
             'model': model,
-            'labels': labels
-        }
+            'labels': labels}
 
     # Execution Routing
     if not options.get('inspect_path'):
@@ -102,25 +101,26 @@ def infer_all(model_bundle, audio_data):
         for name, data in model_bundle.items():
             model = data['model']
             labels = data['labels']
-            
+
             # Forward pass (Logits)
             logits = model(input_tensor)
-            
+
             # Softmax to get probabilities (sum to 1.0)
             probs = F.softmax(logits, dim=1).squeeze().tolist()
-            
+
             # Handle single class case or list conversion
             if not isinstance(probs, list):
                 probs = [probs]
-                
+
             # Create readable dictionary
             # e.g., {'empty': 0.1, 'barking': 0.9}
-            class_probs = {labels[i]: round(probs[i], 4) for i in range(len(labels))}
-            
+            class_probs = {labels[i]: round(probs[i], 4)
+                           for i in range(len(labels))}
+
             # Get best match
             best_idx = torch.argmax(logits, dim=1).item()
             best_label = labels[best_idx]
-            
+
             results[name] = {
                 'match': best_label,
                 'confidence': class_probs[best_label],
