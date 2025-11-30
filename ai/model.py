@@ -2,6 +2,8 @@
 Disturbance Tracker - Machine Learning Model Definition
 '''
 import logging
+
+# 3rd-Party
 import numpy as np
 import torch
 from torch import nn
@@ -12,11 +14,13 @@ import skimage
 import ai.options
 
 
-# NOTE: BytesPerSecond from src/ffmpeg/ffmpeg.go
-AUDIO_LENGTH_BYTES = 192000
+# NOTE: Copied from src/ffmpeg/ffmpeg.go
+BYTES_PER_SECOND = 96000
 SAMPLE_RATE = 48000
 
-# Magic calculations for skimage
+# NOTE: Copied from src/model/model.go
+SEGMENT_SIZE = 2
+SAMPLE_SIZE = SAMPLE_RATE * SEGMENT_SIZE
 N_MELS = 128
 N_FFT = 2048
 HOP_LENGTH = 512
@@ -161,11 +165,11 @@ def pad_audio(raw_data):
     Ensure audio slice is an exact size. (should not be needed)
     '''
     # Pad with silence (zeros) if the clip is too short
-    if len(raw_data) < AUDIO_LENGTH_BYTES:
-        raw_data += b'\x00' * (AUDIO_LENGTH_BYTES - len(raw_data))
+    if len(raw_data) < SAMPLE_SIZE:
+        raw_data += b'\x00' * (SAMPLE_SIZE - len(raw_data))
     # Truncate if the clip is too long
-    elif len(raw_data) > AUDIO_LENGTH_BYTES:
-        raw_data = raw_data[:AUDIO_LENGTH_BYTES]
+    elif len(raw_data) > SAMPLE_SIZE:
+        raw_data = raw_data[:SAMPLE_SIZE]
     return raw_data
 
 

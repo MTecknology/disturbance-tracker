@@ -6,11 +6,13 @@ Uses directory structure: tags/<model_name>/<class>/<audio_segment>.dat
 import logging
 import pathlib
 import json
+import sys
+
+# 3rd-Party
 import audiomentations
 import sklearn.model_selection
 import torch
 import tqdm
-import sys
 
 # DTrack
 import ai.model
@@ -36,12 +38,9 @@ class AudioDataset(torch.utils.data.Dataset):
 
         # Apply Augmentations
         if self.augmentations:
-            try:
-                audio = self.augmentations(
-                        samples=audio,
-                        sample_rate=ai.model.SAMPLE_RATE)
-            except Exception:
-                pass
+            audio = self.augmentations(
+                    samples=audio,
+                    sample_rate=ai.model.SAMPLE_RATE)
 
         spectrogram = ai.model.audio_to_spectrogram(audio)
         return spectrogram, torch.tensor(label, dtype=torch.long)
@@ -105,7 +104,9 @@ def train_model(model_name, options):
     models_dir.mkdir(parents=True, exist_ok=True)
 
     # Save Labels Map
-    with open(models_dir / f'{model_name}_labels.json', 'w') as fh:
+    with open(
+            models_dir / f'{model_name}_labels.json', 'w',
+            encoding='utf-8') as fh:
         json.dump(classes, fh)
 
     all_files = []

@@ -1,11 +1,14 @@
 '''
 Disturbance Tracker - Inspection Utility (Multi-Class)
 '''
+import json
 import logging
 import pathlib
 import pprint
+import subprocess
 import sys
-import json
+
+# 3rd-Party
 import torch
 import torch.nn.functional as F
 
@@ -22,18 +25,17 @@ def check_input():
     workspace = pathlib.Path(options['workspace'])
 
     # Load models and their labels
-    loaded_models = {}
-
     if not options['inspect_models']:
         raise ValueError('No inspection models are configured.')
 
+    loaded_models = {}
     for model_name in options['inspect_models']:
         # Load Labels
         labels_path = workspace / 'models' / f'{model_name}_labels.json'
         if not labels_path.exists():
             raise FileNotFoundError(f'Labels missing for {model_name}')
 
-        with open(labels_path, 'r') as fh:
+        with open(labels_path, 'r', encoding='utf-8') as fh:
             labels = json.load(fh)
 
         # Load Model
@@ -46,6 +48,7 @@ def check_input():
 
     # Execution Routing
     if not options.get('inspect_path'):
+        # stdin
         logging.debug('Running inference with standard input')
         audio = sys.stdin.buffer.read()
         if not audio:
@@ -54,27 +57,57 @@ def check_input():
     else:
         inspect_path = pathlib.Path(options['inspect_path'])
         if inspect_path.is_file():
+            # single file
             logging.debug('Running inference with single file')
-            for audio in slice_audio(inspect_path):
-                pprint.pprint(infer_all(loaded_models, audio))
+            check_file(inspect_path, loaded_models)
 
         elif inspect_path.is_dir():
+            # directory of files
             logging.debug('Running inference with directory of mkv files')
-            for filename in inspect_path.glob('*.*'):
-                logging.info('Reviewing %s', filename)
-                for audio in slice_audio(filename):
-                    pprint.pprint(infer_all(loaded_models, audio))
+            for filename in sorted(inspect_path.glob('*.*')):
+                check_file(filename, loaded_models)
         else:
             raise OSError(f'Could not find {inspect_path}')
+
+
+def check_file(fpath, models):
+    '''
+    Print results of single-file inspection
+    '''
+    i = 0
+    for audio in slice_audio(fpath):
+        i += 1
+        for model, prob in infer_all(models, audio).items():
+            if prob['match'] != 'empty':
+                logging.debug(prob['distribution'])
+                print(
+                        f'Matched {model}/{prob["match"]}'
+                        f'in {fpath.name} @{i}')
 
 
 def slice_audio(path):
     '''
     Return a list of numpy-prepared 2-second segments from audio file
     '''
-    # Test against tagged pcm data files
     if path.match('*.dat'):
+        # Read tagged audio data
         return [ai.model.open_audio_file(path)]
+    if path.match('*.mkv'):
+        # Read entire audio stream from mkv file
+        with subprocess.Popen(
+                ["ffmpeg", "-y", "-loglevel", "warning",
+                 "-nostdin", "-nostats", "-i", str(path),
+                 "-map", "0:a:0", "-f", "s16le",
+                 "-ar", str(ai.model.SAMPLE_RATE), "-ac", "1",
+                 "-"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL) as proc:
+            raw_audio = proc.communicate()[0]
+
+        # Slice into 2s segments with 1s overlap using list comprehension
+        bps = ai.model.BYTES_PER_SECOND
+        return [ai.model.normalize_audio(raw_audio[i:i+ai.model.SAMPLE_SIZE])
+                for i in range(0, len(raw_audio)-bps, bps)]
 
     logging.warning('Skipping %s (wrong file type or not implemented)', path)
     return []
@@ -124,8 +157,7 @@ def infer_all(model_bundle, audio_data):
             results[name] = {
                 'match': best_label,
                 'confidence': class_probs[best_label],
-                'distribution': class_probs
-            }
+                'distribution': class_probs}
 
     return results
 
