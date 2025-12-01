@@ -24,6 +24,15 @@ N_MELS = 128
 N_FFT = 2048
 HOP_LENGTH = 512
 
+# Mel Spectrogram Filter Bank
+MEL_BASIS = librosa.filters.mel(
+        htk=True,  # Force HTK math (Matches Go "2595/700" logic)
+        sr=SAMPLE_RATE,
+        n_fft=N_FFT,
+        n_mels=N_MELS,
+        fmax=24000.0,
+        fmin=0.0)
+
 # Use CUDA device if available, or else CPU
 CUDA_CPU = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -177,22 +186,19 @@ def audio_to_spectrogram(audio_data):
     Converts to Power Spectrogram and RESIZES to match
     the model's expected N_MELS dimension.
     '''
-    # Convert audio to Mel Spectrogram and Decibles
-    spectrogram = librosa.feature.melspectrogram(
-            y=audio_data,
-            sr=SAMPLE_RATE,
-            n_fft=N_FFT,
-            hop_length=HOP_LENGTH,
-            n_mels=N_MELS,
-            htk=True,  # htk forces 2595/700 (human hearing) constants
-            fmax=24000.0,  # force nyquist (Must match Go/MaxFreq)
-            fmin=0.0)
-    decibles = librosa.power_to_db(spectrogram, ref=np.max)
+    # Manually Compute Power STFT
+    stft = np.abs(librosa.stft(
+        y=audio_data,
+        n_fft=N_FFT,
+        hop_length=HOP_LENGTH)) ** 2
 
-    # Remove lower 80 decibles to prevent "quiet noise"
-    decibles = np.clip(decibles, -80, 0)
-    image = (decibles + 80) / 80
+    # Apply cached Mel Lens (Matrix Multiplication)
+    s_mel = np.dot(MEL_BASIS, stft)
+    s_db = librosa.power_to_db(s_mel, ref=np.max)
 
-    # Return single-dimension channel
-    image_e = np.expand_dims(image, axis=0)
-    return torch.tensor(image_e, dtype=torch.float32)
+    # Fixed Normalization (-80dB floor)
+    s_db = np.clip(s_db, -80, 0)
+    img = (s_db + 80) / 80
+
+    # Return single-dimension channel (N, 1, H, W)
+    return torch.tensor(np.expand_dims(img, axis=0), dtype=torch.float32)

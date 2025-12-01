@@ -14,11 +14,26 @@ const (
 	MelBreak  = 700.0
 )
 
-// Converts a Linear Power Spectrogram to a Mel Spectrogram; Replicates librosa.filters.mel()
-func applyMelFilterbank(powerSpec [][]float64, numLinearBins, numFrames int) [][]float64 {
+var (
+	// Cache initial values; Prevents recaclulating values 100x/sec
+	cachedMelWeights [][]float64  // The weights: [MelBin][LinearBin]
+	cachedMelBounds []filterBound // Filter Bounds: Prevent multilpy by zero
+)
+
+// Simple container to store boundaries
+type filterBound struct {
+	start int
+	end   int
+}
+
+
+// Pre-calculate the Mel Spetrogram "Lens"
+func init() {
+	// Calculate Matrix Dimensions
+	numLinearBins := Nfft/2 + 1
 	minMel := hzToMel(MinFreq)
 	maxMel := hzToMel(MaxFreq)
-	
+
 	// Create Mel Frequency Points
 	melPoints := make([]float64, Nmels+2)
 	step := (maxMel - minMel) / float64(Nmels+1)
@@ -30,41 +45,64 @@ func applyMelFilterbank(powerSpec [][]float64, numLinearBins, numFrames int) [][
 	// Convert Hz to FFT Bin Indices
 	binPoints := make([]int, len(melPoints))
 	for i, freq := range melPoints {
-		// bin = freq * (Nfft+1) / SampleRate
-		binPoints[i] = int(math.Floor((Nfft + 1) * freq / float64(ffmpeg.SampleRate)))
+		binPoints[i] = int(math.Floor((Nfft + 1) * freq / float64(SampleRate)))
 	}
 
-	// Create Filter Matrix [Nmels][LinearBins]
-	filters := make([][]float64, Nmels)
+	// Generate Weights and Bounds
+	cachedMelWeights = make([][]float64, Nmels)
+	cachedMelBounds = make([]filterBound, Nmels)
+
 	for i := 0; i < Nmels; i++ {
-		filters[i] = make([]float64, numLinearBins)
+		cachedMelWeights[i] = make([]float64, numLinearBins)
+
+		// Identify bounds
 		start := binPoints[i]
 		center := binPoints[i+1]
 		end := binPoints[i+2]
 
-		// Triangle Up
+		// Store discovered bounds
+		cachedMelBounds[i] = filterBound{
+			start: start,
+			end:   end,
+		}
+
+		// Triangle Weight: Rising edge
 		for f := start; f < center; f++ {
 			if f >= numLinearBins { break }
-			filters[i][f] = float64(f-start) / float64(center-start)
+			cachedMelWeights[i][f] = float64(f-start) / float64(center-start)
 		}
-		// Triangle Down
+		// Triangle Weight: Falling edge
 		for f := center; f < end; f++ {
 			if f >= numLinearBins { break }
-			filters[i][f] = float64(end-f) / float64(end-center)
+			cachedMelWeights[i][f] = float64(end-f) / float64(end-center)
 		}
 	}
+}
 
-	// Matrix Dot Product: [Nmels x Linear] . [Linear x Time] = [Nmels x Time]
+// Converts a Linear Power Spectrogram to a Mel Spectrogram; Replicates librosa.filters.mel()
+func applyMelFilterbank(powerSpec [][]float64, numLinearBins, numFrames int) [][]float64 {
+	// Initialize Output
 	melSpec := make([][]float64, Nmels)
 	for i := range melSpec {
 		melSpec[i] = make([]float64, numFrames)
 	}
 
+	// Loop Mel Bins (rows)
 	for m := 0; m < Nmels; m++ {
+		// Retrieve pre-calculated optimization bounds
+		start := cachedMelBounds[m].start
+		end := cachedMelBounds[m].end
+		if end > numLinearBins {
+			end = numLinearBins
+		}
+
+		// Loop Time Frames (columns)
 		for t := 0; t < numFrames; t++ {
 			sum := 0.0
-			for k := 0; k < numLinearBins; k++ {
-				sum += filters[m][k] * powerSpec[k][t]
+
+			// Only iterate where the filter is not zero
+			for k := start; k < end; k++ {
+				sum += cachedMelWeights[m][k] * powerSpec[k][t]
 			}
 			melSpec[m][t] = sum
 		}
@@ -95,8 +133,8 @@ func powerToDb(spec [][]float64) [][]float64 {
 	rows := len(spec)
 	cols := len(spec[0])
 	dbSpec := make([][]float64, rows)
-	
-	// Find Global Max for Reference
+
+	// Find Global Max
 	var maxVal float64 = 1e-10
 	for r := 0; r < rows; r++ {
 		dbSpec[r] = make([]float64, cols)

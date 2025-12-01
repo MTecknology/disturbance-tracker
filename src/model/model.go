@@ -54,14 +54,13 @@ func Train() {
 func Load(model_path string) OnnxModel {
 	log.Debug("Loading model from %s", model_path)
 
-	// 1. Read .onnx file
+	// Read .onnx file
 	bytes, err := os.ReadFile(model_path)
 	if err != nil {
 		log.Die("could not read ONNX file: %s", err)
 	}
 
-	// 2. Read _labels.json file
-	// e.g. whistle.onnx -> whistle_labels.json
+	// Read _labels.json file (e.g. whistle.onnx -> whistle_labels.json)
 	ext := filepath.Ext(model_path)
 	jsonPath := strings.TrimSuffix(model_path, ext) + "_labels.json"
 
@@ -83,7 +82,7 @@ func Load(model_path string) OnnxModel {
 	}
 }
 
-// Prepare takes raw audio bytes and converts them to a ready-to-infer tensor (DSP logic).
+// Prepare raw audio bytes and convert them to a ready-to-infer tensor (DSP logic)
 func Prepare(pcmData []byte) (*tensor.Dense, error) {
 	// 1. Pad/Truncate the data to ensure fixed length (SampleSize)
 	if len(pcmData) < SampleSize {
@@ -187,29 +186,29 @@ func Prepare(pcmData []byte) (*tensor.Dense, error) {
 // Infer runs the model and returns a MAP of probabilities (Multi-Class).
 // Returns: map["barking"] = 0.8, map["empty"] = 0.2
 func Infer(inferModel OnnxModel, preparedAudio *tensor.Dense) map[string]float64 {
-	// 1. Create Backend
+	// Create Backend
 	backend := gorgonnx.NewGraph()
 	onnxModel := onnx.NewModel(backend)
 
-	// 2. Unmarshal
+	// Unmarshal
 	if err := onnxModel.UnmarshalBinary(inferModel.RawBytes); err != nil {
 		log.Die("could not unmarshal ONNX model: %s", err)
 	}
 
-	// 3. Run
+	// Run Inference
 	onnxModel.SetInput(0, tensor.Tensor(preparedAudio))
 	if err := backend.Run(); err != nil {
 		log.Die("Inference failed: %v", err)
 	}
 
-	// 4. Get Output
+	// Get Output
 	outputTensors, _ := onnxModel.GetOutputTensors()
 	outputDense, ok := outputTensors[0].(*tensor.Dense)
 	if !ok {
 		log.Die("Output tensor is not a *tensor.Dense type.")
 	}
 
-	// 5. Convert Logits to Probabilities (Softmax)
+	// Convert Logits to Probabilities (Softmax)
 	floatSlice := outputDense.Data().([]float32) // Gorgonia usually returns float32
 	logits := make([]float64, len(floatSlice))
 	for i, v := range floatSlice {
@@ -218,7 +217,7 @@ func Infer(inferModel OnnxModel, preparedAudio *tensor.Dense) map[string]float64
 
 	probs := softmax(logits)
 
-	// 6. Map to Labels
+	// Map to Labels
 	results := make(map[string]float64)
 	for i, label := range inferModel.Labels {
 		if i < len(probs) {
